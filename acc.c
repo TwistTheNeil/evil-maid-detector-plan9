@@ -1,6 +1,9 @@
 #include<u.h>
 #include<libc.h>
 
+#define ON 1
+#define OFF 0
+
 #define i2caddress 0x1D
 #define ctrl_reg1 0x2A
 #define ctrl_reg2 0x2B
@@ -14,41 +17,38 @@
 #define XYZ_DATA_CFG 0x0E
 #define F_SETUP 0x09
 
+int i2c_write(uchar *buf, int len, int fd);
+
 int
-acc_bind(int *data, int *ctl) {
-	*data = open("/dev/i2c.1d.data", ORDWR);
+i2c_bind(int *data, int *ctl, uchar addr) {
+	char data_path[20];
+	char ctl_path[20];
+	char driver_name[5];
+
+	sprint(data_path, "/dev/i2c.%x.data\0", addr);
+	sprint(ctl_path, "/dev/i2c.%x.ctl\0", addr);
+	sprint(driver_name, "#J%x\0", addr);
+
+	*data = open(data_path, ORDWR);
 	if(*data < 0) {
-		bind("#J1d", "/dev", MAFTER);
-		*data = open("/dev/i2c.1d.data", ORDWR);
+		bind(driver_name, "/dev", MAFTER);
+		*data = open(data_path, ORDWR);
 		if(*data < 0) {
-			print("Error opening /dev/i2c.1d.data\n");
+			print("Error opening %s\n", data_path);
 			return -1;
 		}
 	}
-	*ctl = open("/dev/i2c.1d.ctl", ORDWR);
+	*ctl = open(ctl_path, ORDWR);
 	return 0;
 }
 
-int
-acc_subaddress_off(int ctl) {
-	char subaddr_0[13] = "subaddress 0\0";
-	if(pwrite(ctl, subaddr_0, strlen(subaddr_0), 0) != strlen(subaddr_0)) {
-		print("Failed to turn off subaddressing\n");
-		return -1;
-	}
-	return 0;
-}
+void
+toggle_subaddress(int ctl, int toggle) {
+	char *subaddr_mode = calloc(13, sizeof(char));
 
-int
-acc_subaddress_on(int ctl) {
-	char subaddr_1[13] = "subaddress 1\0";
-
-// TODO use i2c_write instead
-	if(pwrite(ctl, subaddr_1, strlen(subaddr_1), 0) != strlen(subaddr_1)) {
-		print("Failed to turn on subaddressing\n");
-		return -1;
-	}
-	return 0;
+	sprint(subaddr_mode, "subaddress %d\0", toggle);
+	i2c_write((uchar*)subaddr_mode, 13, ctl);
+	free(subaddr_mode);
 }
 
 int
@@ -73,32 +73,16 @@ create_i2c_write_buffer(uchar addr, uchar instr) {
 }
 
 int
-acc_read_register(int fd_data, int fd_ctl, uchar addr, uchar *buf) {
+i2c_read_register(int fd_data, int fd_ctl, uchar addr, uchar *buf, int nlen) {
 	int ret;
 
-	acc_subaddress_on(fd_ctl);
+	toggle_subaddress(fd_ctl, ON);
 	sleep(3);
-	ret = pread(fd_data, buf, 1, addr);
-	acc_subaddress_off(fd_ctl);
-	sleep(3);
-
-	if(ret != 1) {
-		return -1;
-	}
-	return 0;
-}
-
-int
-acc_read_6_register(int fd_data, int fd_ctl, uchar addr, uchar *buf) {
-	int ret;
-
-	acc_subaddress_on(fd_ctl);
-	sleep(3);
-	ret = pread(fd_data, buf, 6, addr);
-	acc_subaddress_off(fd_ctl);
+	ret = pread(fd_data, buf, nlen, addr);
+	toggle_subaddress(fd_ctl, OFF);
 	sleep(3);
 
-	if(ret != 6) {
+	if(ret != nlen) {
 		return -1;
 	}
 	return 0;
@@ -117,7 +101,7 @@ acc_activate(int acc_data, int acc_ctl) {
 	}*/
 
 	print("Double checking device ID");
-	err = acc_read_register(acc_data, acc_ctl, whoami, buf);
+	err = i2c_read_register(acc_data, acc_ctl, whoami, buf, 1);
 	if(err < 0) {
 		print("\nFailed reading ctrl register 1\n");
 		return -1;
@@ -133,9 +117,9 @@ acc_activate(int acc_data, int acc_ctl) {
 		print("Failed to reset accelerometer\n");
 		return -1;
 	}
-	err = acc_read_register(acc_data, acc_ctl, ctrl_reg2, &temp);
+	err = i2c_read_register(acc_data, acc_ctl, ctrl_reg2, &temp, 1);
 	while( (temp & (1<<6) ) == 1) {
-		err = acc_read_register(acc_data, acc_ctl, ctrl_reg2, &temp);
+		err = i2c_read_register(acc_data, acc_ctl, ctrl_reg2, &temp, 1);
 		sleep(300);
 	}
 
@@ -177,17 +161,17 @@ acc_activate(int acc_data, int acc_ctl) {
 }
 
 int
-acc_initialize(int *acc_data, int *acc_ctl) {
+acc_initialize(int *acc_data, int *acc_ctl, uchar addr) {
 	int err;
 
 	print("Binding i2c interface\n");
-	err = acc_bind(acc_data, acc_ctl);
+	err = i2c_bind(acc_data, acc_ctl, addr);
 	if(err < 0) {
 		return -1;
 	}
 
 	print("Activating accelerometer\n");
-	acc_subaddress_off(*acc_ctl);
+	toggle_subaddress(*acc_ctl, OFF);
 	err = acc_activate(*acc_data, *acc_ctl);
 	if(err < 0) {
 		return -1;
@@ -200,35 +184,26 @@ int
 acc_get_sample(int acc_ctl, int acc_data) {
 	uchar x_msb, x_lsb, y_msb, y_lsb, z_msb, z_lsb;
 	uchar pl_status, xyz_range;
-
-	uchar x[6];
 	int read;
 
 	x_msb = 0;
 
-	read = acc_read_register(acc_data, acc_ctl, 0x01, &x_msb);
+	read = i2c_read_register(acc_data, acc_ctl, 0x01, &x_msb, 1);
 	if(read < 0) {
 		print("failed read\n");
 	} else {
 		print("read!: %x\n", x_msb);
 	}
-	read = acc_read_register(acc_data, acc_ctl, 0x02, &x_lsb);
-	read = acc_read_register(acc_data, acc_ctl, 0x03, &y_msb);
-	read = acc_read_register(acc_data, acc_ctl, 0x04, &y_lsb);
-	read = acc_read_register(acc_data, acc_ctl, 0x05, &z_msb);
-	read = acc_read_register(acc_data, acc_ctl, 0x06, &z_lsb);
-	read = acc_read_register(acc_data, acc_ctl, plstatus, &pl_status);
-	read = acc_read_register(acc_data, acc_ctl, XYZ_DATA_CFG, &xyz_range);
+	read = i2c_read_register(acc_data, acc_ctl, 0x02, &x_lsb, 1);
+	read = i2c_read_register(acc_data, acc_ctl, 0x03, &y_msb, 1);
+	read = i2c_read_register(acc_data, acc_ctl, 0x04, &y_lsb, 1);
+	read = i2c_read_register(acc_data, acc_ctl, 0x05, &z_msb, 1);
+	read = i2c_read_register(acc_data, acc_ctl, 0x06, &z_lsb, 1);
+	read = i2c_read_register(acc_data, acc_ctl, plstatus, &pl_status, 1);
+	read = i2c_read_register(acc_data, acc_ctl, XYZ_DATA_CFG, &xyz_range, 1);
 
 	print("XYZ: %x %x %x %x %x %x, PL: %x, G: %x\n", x_msb, x_lsb, y_msb, y_lsb, z_msb, z_lsb, pl_status, xyz_range);
 	
-
-	read = acc_read_6_register(acc_data, acc_ctl, 0x01, x);
-	if (read < 0) {
-		print("read_6 failed\n");
-		return -1;
-	}
-	print("R6: %x\n", x);
 	return 0;
 }
 
@@ -238,7 +213,7 @@ main() {
 	int i, err;
 
 	print("Initializing\n");
-	err = acc_initialize(&acc_data, &acc_ctl);
+	err = acc_initialize(&acc_data, &acc_ctl, 0x1D);
 	if(err < 0) {
 		print("Error initializing accelerometer\n");
 		return;
