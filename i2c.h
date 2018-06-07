@@ -75,3 +75,19 @@ i2c_read_register(int fd_data, int fd_ctl, uchar addr, uchar *buf, int nlen) {
 	}
 	return 0;
 }
+
+int
+i2c_read_int_register(int fd_data, int fd_ctl, uchar addr, char *buf, int nlen) {
+	int ret;
+
+	toggle_subaddress(fd_ctl, ON);
+	sleep(3);
+	ret = pread(fd_data, buf, nlen, addr);
+	toggle_subaddress(fd_ctl, OFF);
+	sleep(3);
+
+	if(ret != nlen) {
+		return -1;
+	}
+	return 0;
+}
