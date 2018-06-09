@@ -2,20 +2,41 @@
 #include<libc.h>
 #include"acc.c"
 
-#define MAX_DELTA 0.5 // Change this later
+#define MAX_DELTA 1.15
+#define MIN_DELTA -MAX_DELTA
 
-int
-delta(float x[2]) {
-	return abs(x[1] - x[0]);
+float
+delta(float *x, int count) {
+	int i;
+	float avg_1 = 0;
+	float avg_2 = 0;
+
+	for(i = 0; i<count/2; i++) {
+		avg_1 += x[i];
+	}
+
+	for(i = 0; i<count; i++) {
+		avg_2 += x[i];
+	}
+
+	avg_1 = avg_1/((float)(count/2));
+	avg_2 = avg_2/((float)(count));
+
+//print("avg -> %.6f, %.6f\n", avg_1, avg_2);
+	return avg_1/avg_2;
 }
 
 int
-check_delta(struct emdstack s) {
+check_delta(struct emdqueue *s) {
+	float x_delta = delta(s->x, s->n_x);
+	float y_delta = delta(s->y, s->n_y);
+	float z_delta = delta(s->z, s->n_z);
+//print("%.6f %.6f %.6f\n", x_delta, y_delta, z_delta);
 	if(
-		delta(s.x) > MAX_DELTA ||
-		delta(s.y) > MAX_DELTA ||
-		//delta(s.z) > MAX_DELTA ||
-		s.orientation[1] != s.orientation[0]
+		(x_delta > MAX_DELTA || x_delta < MIN_DELTA) ||
+		(y_delta > MAX_DELTA || y_delta < MIN_DELTA) ||
+		(z_delta > MAX_DELTA || z_delta < MIN_DELTA) ||
+		s->orientation[1] != s->orientation[0]
 	) {
 		return 1;
 	}
@@ -26,7 +47,7 @@ check_delta(struct emdstack s) {
 void
 main() {
 	int acc_ctl, acc_data;
-	struct emdstack emd;
+	struct emdqueue *emd = init_emdqueue();
 	int i, err;
 
 	print("Initializing\n");
@@ -37,10 +58,11 @@ main() {
 	}
 
 	for(i=0; ;i++) {
-		acc_get_sample(acc_ctl, acc_data, &emd);
-print("(%.6f, %.6f, %.6f)\n", emd.x[1], emd.y[1], emd.z[1]);
-		if(i>2 && (check_delta(emd) == 1)) {
+		acc_get_sample(acc_ctl, acc_data, emd);
+		if(i>50 && (check_delta(emd) == 1)) {
 			break;
 		}
 	}
+
+print_emdqueue(emd);
 }
