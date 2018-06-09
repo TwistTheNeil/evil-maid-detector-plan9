@@ -1,4 +1,5 @@
 #include "i2c.h"
+#include "emdqueue.c"
 
 #define i2caddress 0x1D
 #define ctrl_reg1 0x2A
@@ -14,13 +15,6 @@
 #define F_SETUP 0x09
 
 float GRAVITY = 9.8;
-
-struct emdstack {
-	float x[2];
-	float y[2];
-	float z[2];
-	uchar orientation[2];
-};
 
 int
 acc_activate(int acc_data, int acc_ctl) {
@@ -104,7 +98,7 @@ acc_initialize(int *acc_data, int *acc_ctl, uchar addr) {
 }
 
 int
-acc_get_sample(int acc_ctl, int acc_data, struct emdstack *emd) {
+acc_get_sample(int acc_ctl, int acc_data, struct emdqueue *emd) {
 	char acc_out[6];
 	uchar pl_status;
 	int read;
@@ -115,12 +109,11 @@ acc_get_sample(int acc_ctl, int acc_data, struct emdstack *emd) {
 		return -1;
 	}
 
-	emd->x[0] = emd->x[1];
-	emd->x[1] = (float)((short)(((acc_out[0]<<8) | (acc_out[1]))>>2))/2048*GRAVITY;
-	emd->y[0] = emd->y[1];
-	emd->y[1] = (float)((short)(((acc_out[2]<<8) | (acc_out[3]))>>2))/2048*GRAVITY;
-	emd->z[0] = emd->z[1];
-	emd->z[1] = (float)((short)(((acc_out[4]<<8) | (acc_out[5]))>>2))/2048*GRAVITY;
+	emdq_push(emd,
+			(float)((short)(((acc_out[0]<<8) | (acc_out[1]))>>2))/2048*GRAVITY,
+			(float)((short)(((acc_out[2]<<8) | (acc_out[3]))>>2))/2048*GRAVITY,
+			(float)((short)(((acc_out[4]<<8) | (acc_out[5]))>>2))/2048*GRAVITY,
+			0x00); // TODO get orientation data
 
 	//print("x: %.6f: %x %x\n", (float)((short)(((status[0]<<8) | (status[1]))>>2))/2048*GRAVITY, status[0], status[1]);
 
