@@ -43,7 +43,7 @@ init_emdqueue(void) {
    maximum capacity
 */
 void
-emds_squeeze(float **q, float e, int *count) {
+emdq_squeeze(float **q, float e, int *count) {
 	int i = 0;
 
 	for(i=0; (*count) == QUEUE_MAX && i<(*count)-1; i++) {
@@ -59,9 +59,9 @@ emds_squeeze(float **q, float e, int *count) {
 
 void
 emdq_push(struct emdqueue *s, float x, float y, float z, uchar orientation) {
-	emds_squeeze(&s->x, x, &(s->n_x));
-	emds_squeeze(&s->y, y, &(s->n_y));
-	emds_squeeze(&s->z, z, &(s->n_z));
+	emdq_squeeze(&s->x, x, &(s->n_x));
+	emdq_squeeze(&s->y, y, &(s->n_y));
+	emdq_squeeze(&s->z, z, &(s->n_z));
 
 // TODO: make a generic to handle uchar?
 	s->orientation[0] = s->orientation[1];
