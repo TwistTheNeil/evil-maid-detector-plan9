@@ -2,6 +2,7 @@
 #include "emdqueue.c"
 
 #define i2caddress 0x1D
+#define OUT_REG 0x01
 #define ctrl_reg1 0x2A
 #define ctrl_reg2 0x2B
 #define ctrl_reg4 0x2D
@@ -13,6 +14,7 @@
 #define deviceid 0x1A
 #define XYZ_DATA_CFG 0x0E
 #define F_SETUP 0x09
+#define DIVIDER_4G 2048
 
 float GRAVITY = 9.8;
 
@@ -103,21 +105,26 @@ acc_get_sample(int acc_ctl, int acc_data, struct emdqueue *emd) {
 	uchar pl_status;
 	int read;
 
-	read = i2c_read_int_register(acc_data, acc_ctl, 0x01, acc_out, 6);
+	read = i2c_read_int_register(acc_data, acc_ctl, OUT_REG, acc_out, 6);
 	if(read < 0) {
 		print("Error reading 6 bytes from registers\n");
 		return -1;
 	}
 
+	read = i2c_read_register(acc_data, acc_ctl, plstatus, &pl_status, 1);
+	if(read < 0) {
+		print("Error reading P/L status\n");
+		return -1;
+	}
+
 	emdq_push(emd,
-			(float)((short)(((acc_out[0]<<8) | (acc_out[1]))>>2))/2048*GRAVITY,
-			(float)((short)(((acc_out[2]<<8) | (acc_out[3]))>>2))/2048*GRAVITY,
-			(float)((short)(((acc_out[4]<<8) | (acc_out[5]))>>2))/2048*GRAVITY,
-			0x00); // TODO get orientation data
+			(float)((short)(((acc_out[0]<<8) | (acc_out[1]))>>2))/DIVIDER_4G*GRAVITY,
+			(float)((short)(((acc_out[2]<<8) | (acc_out[3]))>>2))/DIVIDER_4G*GRAVITY,
+			(float)((short)(((acc_out[4]<<8) | (acc_out[5]))>>2))/DIVIDER_4G*GRAVITY,
+			pl_status
+	);
 
 	//print("x: %.6f: %x %x\n", (float)((short)(((status[0]<<8) | (status[1]))>>2))/2048*GRAVITY, status[0], status[1]);
-
-// get PL reading?
 	
 	return 0;
 }
