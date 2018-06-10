@@ -17,3 +17,11 @@ up motion and tilts and the cellular breakout will notify the owner of an
 attempt via a text message using the FONA breakout. Of course, this will have
 false alerts especially if you have a cat.
 
+### Compiling and Running
+```
+$ 5c emd.c
+$ 5l emd.5
+$ ./5.out 1234567890
+```
+
+Replacing `1234567890` with your own target cell phone number for notification
