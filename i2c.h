@@ -4,6 +4,7 @@
 int i2c_write(uchar *buf, int len, int fd);
 int i2c_bind(int *data, int *ctl, uchar addr);
 int i2c_read_register(int fd_data, int fd_ctl, uchar addr, uchar *buf, int nlen);
+int i2c_read_int_register(int fd_data, int fd_ctl, uchar addr, char *buf, int nlen);
 void toggle_subaddress(int ctl, int toggle);
 uchar* create_i2c_write_buffer(uchar addr, uchar instr);
 

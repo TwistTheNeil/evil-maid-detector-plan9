@@ -1,4 +1,4 @@
-#define QUEUE_MAX 100
+#define QUEUE_MAX 700
 
 struct emdqueue {
 	float *x;
@@ -17,7 +17,8 @@ struct emdqueue {
 	int n_o;
 };
 
-struct emdqueue* init_emdqueue(void) {
+struct emdqueue*
+init_emdqueue(void) {
 	struct emdqueue *e = calloc(1, sizeof(struct emdqueue));
 	e->x = calloc(QUEUE_MAX, sizeof(float));
 	e->y = calloc(QUEUE_MAX, sizeof(float));
@@ -41,7 +42,8 @@ struct emdqueue* init_emdqueue(void) {
    remove the first if the new total exceeds the
    maximum capacity
 */
-void emds_squeeze(float **q, float e, int *count) {
+void
+emds_squeeze(float **q, float e, int *count) {
 	int i = 0;
 
 	for(i=0; (*count) == QUEUE_MAX && i<(*count)-1; i++) {
@@ -55,7 +57,8 @@ void emds_squeeze(float **q, float e, int *count) {
 	(*q)[(*count)-1] = e;
 }
 
-void emdq_push(struct emdqueue *s, float x, float y, float z, uchar orientation) {
+void
+emdq_push(struct emdqueue *s, float x, float y, float z, uchar orientation) {
 	emds_squeeze(&s->x, x, &(s->n_x));
 	emds_squeeze(&s->y, y, &(s->n_y));
 	emds_squeeze(&s->z, z, &(s->n_z));
@@ -67,7 +70,8 @@ void emdq_push(struct emdqueue *s, float x, float y, float z, uchar orientation)
 	
 }
 
-void print_emdqueue(struct emdqueue *s) {
+void
+print_emdqueue(struct emdqueue *s) {
 	int i;
 
 	print("X[%d] = [", s->n_x);

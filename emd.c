@@ -1,18 +1,27 @@
 #include<u.h>
 #include<libc.h>
-#include"acc.c"
+#include"acc.h"
 #include"fona.h"
 
-#define MAX_DELTA 2.2
+#define MAX_DELTA 5.0
 #define MIN_DELTA -MAX_DELTA
 
+/*
+  Since there is a lot of noise, a ratio of average of QUEUE_MAX
+  and last 3*QUEUE_MAX/4 samples is used. If there is more than 
+  MAX_DELTA ratio, it breaks the loop.
+  If there is not QUEUE_MAX elements in the queue, then the
+  number of elements is used instead.
+
+  TODO: Refine this...
+*/
 float
 delta(float *x, int count) {
 	int i;
 	float avg_1 = 0;
 	float avg_2 = 0;
 
-	for(i = 0; i<count/2; i++) {
+	for(i = count/4; i<count; i++) {
 		avg_1 += x[i];
 	}
 
@@ -20,11 +29,10 @@ delta(float *x, int count) {
 		avg_2 += x[i];
 	}
 
-	avg_1 = avg_1/((float)(count/2));
+	avg_1 = avg_1/((float)(3*count/4));
 	avg_2 = avg_2/((float)(count));
 
-print("avg -> %.6f, %.6f\n", avg_1, avg_2);
-	return avg_1/avg_2;
+	return avg_2/avg_1;
 }
 
 int
@@ -32,7 +40,7 @@ check_delta(struct emdqueue *s) {
 	float x_delta = delta(s->x, s->n_x);
 	float y_delta = delta(s->y, s->n_y);
 	float z_delta = delta(s->z, s->n_z);
-print("%.6f %.6f %.6f\n", x_delta, y_delta, z_delta);
+
 	if(
 		(x_delta > MAX_DELTA || x_delta < MIN_DELTA) ||
 		(y_delta > MAX_DELTA || y_delta < MIN_DELTA) ||
@@ -68,13 +76,17 @@ main(int argc, char **argv) {
 	/* Initialize fona */
 	init_fona(&eia_data, &eia_ctl);
 
+	/* Start the process */
 	for(i=0; ;i++) {
 		acc_get_sample(acc_ctl, acc_data, emd);
-		if(i>50 && (check_delta(emd) == 1)) {
+		if(i == 500) {
+			print("Starting delta checks\n");
+		}
+		if(i>500 && (check_delta(emd) == 1)) {
 			break;
 		}
 	}
 
-print_emdqueue(emd);
-	//send_sms(eia_data, argv[1]);
+	print("Loop broken - Sending SMS notification\n");
+	send_sms(eia_data, argv[1]);
 }

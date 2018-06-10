@@ -1,5 +1,5 @@
 #include "i2c.h"
-#include "emdqueue.c"
+#include "emdqueue.h"
 
 #define i2caddress 0x1D
 #define OUT_REG 0x01
@@ -53,6 +53,7 @@ acc_activate(int acc_data, int acc_ctl) {
 		return -1;
 	}
 
+	// Enable 4G range
 	if(i2c_write(create_i2c_write_buffer(XYZ_DATA_CFG, 0x01), 2, acc_data) != 2) {
 		print("Failed to enable 4g scale range\n");
 		return -1;
@@ -117,14 +118,12 @@ acc_get_sample(int acc_ctl, int acc_data, struct emdqueue *emd) {
 		return -1;
 	}
 
-	emdq_push(emd,
+	emdq_push(	emd,
 			(float)((short)(((acc_out[0]<<8) | (acc_out[1]))>>2))/DIVIDER_4G*GRAVITY,
 			(float)((short)(((acc_out[2]<<8) | (acc_out[3]))>>2))/DIVIDER_4G*GRAVITY,
 			(float)((short)(((acc_out[4]<<8) | (acc_out[5]))>>2))/DIVIDER_4G*GRAVITY,
 			pl_status
 	);
 
-	//print("x: %.6f: %x %x\n", (float)((short)(((status[0]<<8) | (status[1]))>>2))/2048*GRAVITY, status[0], status[1]);
-	
 	return 0;
 }

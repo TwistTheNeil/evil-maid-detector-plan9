@@ -1,9 +1,14 @@
+// TODO: Return codes
 void
 init_fona(int *eia_data, int *eia_ctl) {
+	print("Initializing FONA 808\n");
 	*eia_data = open("/dev/eia0", ORDWR);
 	*eia_ctl = open("/dev/eia0ctl", ORDWR);
 
+	/* Set baud rate */
 	fprint(*eia_ctl, "b115200\n");
+
+	/* Set parity: 8bit, no parity, 1 stop bit  */
 	fprint(*eia_ctl, "l8 pn s1\n");
 }
 
@@ -31,4 +36,5 @@ send_sms(int eia_data, char *number) {
 	sleep(5000);
 	fprint(eia_data, wmsg);
 	fprint(eia_data, ctrlz);
+	sleep(5000);
 }
