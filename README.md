@@ -17,7 +17,8 @@ up motion and tilts and the cellular breakout will notify the owner of an
 attempt via a text message using the FONA breakout. Of course, this will have
 false alerts especially if you have a cat.
 
-### Compiling and Running
+Compiling and Running
+---
 ```
 $ 5c emd.c
 $ 5l emd.5
@@ -25,3 +26,17 @@ $ ./5.out 1234567890
 ```
 
 Replacing `1234567890` with your own target cell phone number for notification
+
+PFAQ (Possible Freqeuntly Asked Questions)
+---
+* **Why does it take so long to start up?**
+
+   It takes some time ~1 second to start up the accelerometer and it takes ~500
+   samples from the accelerometer to factor in noise.
+
+* **Why does sending a text take so long?**
+
+   It actually doesn't.
+   I didn't have time to learn how libthread works in plan9 to check for return
+   codes. So I use a failsafe of 5 seconds before and after sending commands to
+   flush any messages.
